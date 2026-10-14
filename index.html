@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Pendleton Map Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+:root{
+  --cream:#F5F1E8; --charcoal:#2C2C2C; --leather:#6B4F3A; --sage:#9CAF88; --rust:#B7410E; --sand:#E8DCC6; --white:#FFFFFF;
+  --cat-food:#B7410E; --cat-retail:#6B4F3A; --cat-art:#C9A66B; --cat-entertainment:#9CAF88; --cat-coffee:#8B5A2B; --cat-icecream:#E8B4B8;
+  --shadow:rgba(44,44,44,.08); --shadow-md:rgba(44,44,44,.15); --shadow-lg:rgba(44,44,44,.25);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Inter',sans-serif;background:var(--cream);color:var(--charcoal);overflow:hidden;height:100dvh;display:flex;flex-direction:column}
+#map{flex:1;width:100%;z-index:1}
+
+/* Header */
+.header{position:absolute;top:0;left:0;right:0;z-index:500;background:rgba(245,241,232,.92);backdrop-filter:blur(16px);padding:12px 16px 10px;border-bottom:1px solid var(--sand)}
+.header-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.brand-icon{width:32px;height:32px;background:var(--charcoal);color:var(--cream);border-radius:8px;display:grid;place-items:center;font-weight:700}
+.brand-name{font-weight:700;letter-spacing:-.02em}
+.search-wrap{position:relative}
+.search-wrap input{width:100%;background:var(--white);border:1px solid var(--sand);border-radius:999px;padding:10px 38px 10px 14px;font-size:14px;outline:none}
+.search-wrap input:focus{border-color:var(--leather)}
+.clear-btn{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:var(--sand);width:24px;height:24px;border-radius:50%;cursor:pointer}
+.chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px}
+.chips::-webkit-scrollbar{display:none}
+.chip{white-space:nowrap;border:1px solid var(--sand);background:var(--white);border-radius:999px;padding:7px 14px;font-size:13px;font-weight:500;cursor:pointer;transition:.2s}
+.chip.active{color:var(--white);border-color:transparent}
+.chip[data-cat="food"].active{background:var(--cat-food)}
+.chip[data-cat="retail"].active{background:var(--cat-retail)}
+.chip[data-cat="art"].active{background:var(--cat-art);color:var(--charcoal)}
+.chip[data-cat="entertainment"].active{background:var(--cat-entertainment);color:var(--charcoal)}
+.chip[data-cat="coffee"].active{background:var(--cat-coffee)}
+.chip[data-cat="icecream"].active{background:var(--cat-icecream);color:var(--charcoal)}
+.chip[data-cat="all"].active{background:var(--charcoal)}
+
+/* Markers */
+.custom-marker{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-size:18px;border:2px solid var(--white);box-shadow:0 2px 8px var(--shadow-md);cursor:pointer;transition:.2s}
+.custom-marker.food{background:var(--cat-food)} .custom-marker.retail{background:var(--cat-retail)} .custom-marker.art{background:var(--cat-art)} .custom-marker.entertainment{background:var(--cat-entertainment)} .custom-marker.coffee{background:var(--cat-coffee)} .custom-marker.icecream{background:var(--cat-icecream)}
+.custom-marker.active{transform:scale(1.2);z-index:1000!important;box-shadow:0 4px 16px var(--shadow-lg)}
+.user-dot{width:18px;height:18px;background:#3B82F6;border:3px solid white;border-radius:50%;box-shadow:0 0 0 8px rgba(59,130,246,.2)}
+
+/* List View - NEW */
+#list-view{position:absolute;top:112px;left:0;right:0;bottom:0;z-index:450;background:var(--cream);transform:translateY(105%);transition:transform .38s cubic-bezier(.4,0,.2,1);display:flex;flex-direction:column}
+#list-view.active{transform:translateY(0)}
+.list-header{display:flex;align-items:center;justify-content:space-between;padding:16px;background:var(--white);border-bottom:1px solid var(--sand);position:sticky;top:0}
+.list-header h2{text-transform:capitalize;font-size:18px}
+#list-grid{overflow-y:auto;padding:16px;display:grid;gap:12px;padding-bottom:120px}
+.list-card{background:var(--white);border-radius:16px;padding:14px;display:flex;gap:14px;cursor:pointer;box-shadow:0 2px 8px var(--shadow);transition:.2s}
+.list-card:hover{transform:translateY(-2px);box-shadow:0 6px 20px var(--shadow-md)}
+.list-card .meta{flex:1}
+.list-card h3{font-size:15px;margin-bottom:2px}
+.list-card p{font-size:12px;opacity:.7}
+.badge{font-size:11px;background:var(--sand);padding:3px 8px;border-radius:999px;margin-top:6px;display:inline-block}
+
+/* Bottom Sheet */
+#bottom-sheet{position:absolute;left:0;right:0;bottom:0;z-index:600;background:var(--white);border-radius:24px 24px 0 0;transform:translateY(105%);transition:.38s cubic-bezier(.4,0,.2,1);max-height:82dvh;overflow-y:auto;box-shadow:0 -8px 32px var(--shadow-lg)}
+#bottom-sheet.active{transform:translateY(0)}
+.sheet-handle{width:36px;height:4px;background:var(--sand);border-radius:999px;margin:10px auto}
+.sheet-video{aspect-ratio:16/9;background:var(--sand);overflow:hidden}
+.sheet-video iframe{width:100%;height:100%;border:0}
+.sheet-body{padding:16px}
+.sheet-title{display:flex;justify-content:space-between;gap:10px}
+.sheet-title h2{font-size:20px;line-height:1.2}
+.sheet-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.btn{border-radius:999px;padding:12px;text-align:center;font-weight:600;font-size:14px;text-decoration:none;cursor:pointer;border:0}
+.btn-primary{background:var(--charcoal);color:var(--white)}
+.btn-secondary{background:var(--cream);color:var(--charcoal);border:1px solid var(--sand)}
+
+/* FAB */
+.fab{position:absolute;bottom:20px;right:16px;z-index:400;background:var(--white);border:1px solid var(--sand);border-radius:999px;padding:10px 14px;font-weight:600;box-shadow:0 4px 12px var(--shadow-md);cursor:pointer}
+.fab.list-toggle{right:auto;left:16px}
+
+/* States */
+#loading{position:absolute;inset:0;z-index:900;background:var(--cream);display:grid;place-items:center}
+.toast{position:absolute;bottom:80px;left:50%;transform:translateX(-50%);background:var(--charcoal);color:var(--white);padding:8px 14px;border-radius:999px;font-size:13px;z-index:700;opacity:0;transition:.3s}
+.toast.show{opacity:1}
+
+@media(min-width:768px){
+  .header{max-width:420px;left:16px;top:16px;border-radius:16px;border:1px solid var(--sand)}
+  #list-view{max-width:420px;left:16px;top:140px;bottom:16px;border-radius:16px;border:1px solid var(--sand);overflow:hidden}
+  #bottom-sheet{max-width:420px;left:16px;bottom:16px;border-radius:16px}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <div class="brand-icon">P</div>
+    <div class="brand-name">Pendleton Guide</div>
+  </div>
+  <div class="search-wrap">
+    <input id="search" placeholder="Search tacos, coffee, wool..." />
+    <button class="clear-btn" id="clear">×</button>
+  </div>
+  <div class="chips" id="chips">
+    <button class="chip active" data-cat="all">All</button>
+    <button class="chip" data-cat="food">🍜 Food</button>
+    <button class="chip" data-cat="retail">🛍️ Retail</button>
+    <button class="chip" data-cat="art">🎨 Art</button>
+    <button class="chip" data-cat="entertainment">🎶 Stay</button>
+    <button class="chip" data-cat="coffee">☕ Coffee</button>
+    <button class="chip" data-cat="icecream">🍦 Sweets</button>
+  </div>
+</div>
+
+<div id="map"></div>
+
+<!-- NEW LIST VIEW -->
+<div id="list-view">
+  <div class="list-header">
+    <div>
+      <h2 id="list-title">All places</h2>
+      <div id="list-count" style="font-size:12px;opacity:.6">0 places</div>
+    </div>
+    <button class="chip active" data-cat="all" id="show-map-btn">Map view</button>
+  </div>
+  <div id="list-grid"></div>
+</div>
+
+<div id="bottom-sheet">
+  <div class="sheet-handle"></div>
+  <div class="sheet-video" id="sheet-video"></div>
+  <div class="sheet-body">
+    <div class="sheet-title">
+      <h2 id="sheet-name">Place</h2>
+      <div id="sheet-emoji" class="custom-marker food" style="width:36px;height:36px;flex-shrink:0"></div>
+    </div>
+    <p id="sheet-desc" style="margin-top:8px;font-size:14px;opacity:.8;line-height:1.5"></p>
+    <div style="margin-top:12px;font-size:13px;line-height:1.8">
+      <div>📍 <span id="sheet-address"></span></div>
+      <div>🕒 <span id="sheet-hours"></span></div>
+      <div>📞 <span id="sheet-phone"></span></div>
+    </div>
+    <div class="sheet-actions">
+      <a id="sheet-dir" class="btn btn-primary" target="_blank">Directions</a>
+      <a id="sheet-web" class="btn btn-secondary" target="_blank">Website</a>
+    </div>
+  </div>
+</div>
+
+<button class="fab" id="locate">◎ Near me</button>
+<button class="fab list-toggle" id="toggle-list">☰ List</button>
+
+<div id="loading">Loading map…</div>
+<div class="toast" id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+let allData = [];
+let filtered = [];
+let activeCat = 'all';
+let viewMode = 'map';
+let markers = {};
+let map, userMarker, activeId = null;
+
+const mapEl = document.getElementById('map');
+const listView = document.getElementById('list-view');
+const listGrid = document.getElementById('list-grid');
+const search = document.getElementById('search');
+
+// EMBEDDED FALLBACK - works when opening via file:// (double-click)
+const EMBEDDED_DATA = [
+  {
+    "id": "hamley-steak",
+    "name": "Hamley Steakhouse",
+    "category": "food",
+    "emoji": "🥩",
+    "lat": 45.67215,
+    "lng": -118.78792,
+    "address": "8 SE Court Ave, Pendleton, OR 97801",
+    "hours": "11am - 9pm",
+    "website": "https://hamley.com",
+    "phone": "541-276-3600",
+    "description": "Historic steakhouse serving hand-cut steaks since 1905 inside the Hamley Saloon building.",
+    "videoUrl": "https://www.youtube.com/watch?v=jNQXAC9IVRw",
+    "tags": ["steak", "historic", "bar"]
+  },
+  {
+    "id": "pendleton-woolen",
+    "name": "Pendleton Woolen Mills",
+    "category": "retail",
+    "emoji": "🧶",
+    "lat": 45.6702,
+    "lng": -118.7895,
+    "address": "1307 SE Court Pl, Pendleton, OR",
+    "hours": "9am - 6pm",
+    "website": "https://pendleton-usa.com",
+    "phone": "541-276-6911",
+    "description": "Flagship mill store for iconic Pendleton blankets, apparel, and heritage goods.",
+    "videoUrl": "",
+    "tags": ["wool", "shopping"]
+  },
+  {
+    "id": "sisters-coffee",
+    "name": "Sisters Coffee Co.",
+    "category": "coffee",
+    "emoji": "☕",
+    "lat": 45.6715,
+    "lng": -118.786,
+    "address": "317 S Main St, Pendleton, OR",
+    "hours": "6am - 3pm",
+    "website": "",
+    "phone": "",
+    "description": "Local roaster with single-origin pour-overs and fresh pastries.",
+    "videoUrl": "",
+    "tags": ["coffee", "breakfast"]
+  },
+  {
+    "id": "crows-shadow",
+    "name": "Crow's Shadow Institute",
+    "category": "art",
+    "emoji": "🎨",
+    "lat": 45.6698,
+    "lng": -118.7912,
+    "address": "48004 St Andrews Rd, Pendleton, OR",
+    "hours": "10am - 5pm",
+    "website": "https://crowsshadow.org",
+    "phone": "",
+    "description": "Contemporary Native art print studio and gallery.",
+    "videoUrl": "",
+    "tags": ["art", "native"]
+  },
+  {
+    "id": "prodigal-son",
+    "name": "Prodigal Son Brewery",
+    "category": "entertainment",
+    "emoji": "🍺",
+    "lat": 45.6708,
+    "lng": -118.7883,
+    "address": "230 SE Court Ave, Pendleton, OR",
+    "hours": "12pm - 10pm",
+    "website": "",
+    "phone": "",
+    "description": "Craft brewery with rotating taps, wood-fired pizza, and live music.",
+    "videoUrl": "",
+    "tags": ["beer", "music"]
+  },
+  {
+    "id": "ice-cream-palace",
+    "name": "Oregon Ice Cream Co.",
+    "category": "icecream",
+    "emoji": "🍦",
+    "lat": 45.6728,
+    "lng": -118.7855,
+    "address": "421 S Main St, Pendleton, OR",
+    "hours": "12pm - 9pm",
+    "website": "",
+    "phone": "",
+    "description": "Small-batch ice cream with huckleberry and marionberry flavors.",
+    "videoUrl": "",
+    "tags": ["dessert"]
+  }
+];
+
+async function loadData(){
+  try{
+    const res = await fetch('./data/locations.json');
+    if(res.ok){
+      allData = await res.json();
+      console.log('Loaded from JSON file:', allData.length);
+    } else {
+      throw new Error('fetch not ok');
+    }
+  }catch(e){
+    console.log('Using embedded data (file:// mode):', e.message);
+    allData = EMBEDDED_DATA;
+  }
+  filtered = allData;
+  initMap();
+  renderMarkers();
+  renderList();
+  document.getElementById('loading').style.display='none';
+  console.log('Markers rendered:', filtered.length);
+}
+
+function initMap(){
+  map = L.map('map', {zoomControl:false}).setView([45.671, -118.788], 14.5);
+  // Esri World Street Map - FREE, no API key, production-safe
+  // Alternatives that also work with no key:
+  // - Carto Light: https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png
+  // - Carto Voyager (your original): https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png
+  L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',{
+    attribution:'© Esri © OpenStreetMap contributors',
+    maxZoom: 19
+  }).addTo(map);
+  L.control.zoom({position:'bottomright'}).addTo(map);
+  map.on('click', ()=> closeSheet());
+}
+
+function makeIcon(b){
+  return L.divIcon({className:'', html:`<div class="custom-marker ${b.category} ${activeId===b.id?'active':''}">${b.emoji}</div>`, iconSize:[44,44], iconAnchor:[22,22]});
+}
+
+function renderMarkers(){
+  Object.values(markers).forEach(m=> map.removeLayer(m));
+  markers = {};
+  filtered.forEach(b=>{
+    const m = L.marker([b.lat,b.lng], {icon: makeIcon(b)}).addTo(map);
+    m.on('click', ()=> openSheet(b.id));
+    markers[b.id]=m;
+  });
+}
+
+function renderList(){
+  document.getElementById('list-title').textContent = activeCat==='all' ? 'All places' : activeCat;
+  document.getElementById('list-count').textContent = `${filtered.length} places`;
+  listGrid.innerHTML = filtered.map(b=>`
+    <div class="list-card" onclick="openSheet('${b.id}')">
+      <div class="custom-marker ${b.category}">${b.emoji}</div>
+      <div class="meta">
+        <h3>${b.name}</h3>
+        <p>${b.address}</p>
+        <span class="badge">${b.category} • ${b.hours}</span>
+      </div>
+    </div>
+  `).join('') || `<div style="padding:20px;text-align:center;opacity:.6">No places found</div>`;
+}
+
+function applyFilters(){
+  const q = search.value.toLowerCase();
+  filtered = allData.filter(b=>{
+    const matchCat = activeCat==='all' || b.category===activeCat;
+    const matchQ = !q || b.name.toLowerCase().includes(q) || b.description.toLowerCase().includes(q) || b.tags.join(' ').includes(q);
+    return matchCat && matchQ;
+  });
+  renderMarkers();
+  renderList();
+}
+
+function setCategory(cat){
+  activeCat = cat;
+  document.querySelectorAll('.chip').forEach(c=> c.classList.toggle('active', c.dataset.cat===cat));
+  applyFilters();
+  // NEW REQUIREMENT: show list view when a category is clicked
+  if(cat!=='all'){
+    setView('list');
+  } else {
+    setView('map');
+  }
+}
+
+function setView(mode){
+  viewMode = mode;
+  listView.classList.toggle('active', mode==='list');
+  if(mode==='map'){ setTimeout(()=> map.invalidateSize(), 380); }
+}
+
+function getEmbedUrl(url){
+  if(!url) return '';
+  // Convert any youtube URL to embed-friendly nocookie format
+  try{
+    if(url.includes('youtube.com/embed') || url.includes('youtube-nocookie.com/embed')){
+      return url.replace('youtube.com/embed', 'youtube-nocookie.com/embed') + (url.includes('?') ? '&' : '?') + 'rel=0&modestbranding=1';
+    }
+    if(url.includes('youtu.be/')){
+      const id = url.split('youtu.be/')[1].split('?')[0].split('&')[0];
+      return `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1`;
+    }
+    if(url.includes('youtube.com/watch')){
+      const u = new URL(url);
+      const id = u.searchParams.get('v');
+      if(id) return `https://www.youtube-nocookie.com/embed/${id}?rel=0&modestbranding=1`;
+    }
+  }catch(e){}
+  return url;
+}
+
+function openSheet(id){
+  const b = allData.find(x=>x.id===id);
+  if(!b) return;
+  activeId=id;
+  renderMarkers();
+  document.getElementById('sheet-name').textContent=b.name;
+  document.getElementById('sheet-desc').textContent=b.description;
+  document.getElementById('sheet-address').textContent=b.address;
+  document.getElementById('sheet-hours').textContent=b.hours;
+  document.getElementById('sheet-phone').textContent=b.phone||'—';
+  document.getElementById('sheet-emoji').textContent=b.emoji;
+  document.getElementById('sheet-emoji').className=`custom-marker ${b.category}`;
+  document.getElementById('sheet-dir').href=`https://www.google.com/maps/search/?api=1&query=${b.lat},${b.lng}`;
+  document.getElementById('sheet-web').href=b.website||'#';
+  
+  // FIXED VIDEO HANDLING - no error 153
+  const videoContainer = document.getElementById('sheet-video');
+  if(b.videoUrl){
+    const embedUrl = getEmbedUrl(b.videoUrl);
+    // Use nocookie + proper allows + fallback
+    videoContainer.innerHTML = `
+      <div style="position:relative;width:100%;height:100%;background:var(--sand)">
+        <iframe 
+          src="${embedUrl}" 
+          style="width:100%;height:100%;border:0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+          allowfullscreen
+          referrerpolicy="strict-origin-when-cross-origin"
+          loading="lazy">
+        </iframe>
+        <div id="video-fallback" style="display:none;position:absolute;inset:0;background:var(--sand);display:grid;place-items:center;text-align:center;padding:20px">
+          <div>
+            <div style="font-size:32px;margin-bottom:8px">▶️</div>
+            <p style="font-size:13px;margin-bottom:10px">Video can't be embedded here</p>
+            <a href="${b.videoUrl}" target="_blank" class="btn btn-primary" style="display:inline-block;padding:8px 16px">Watch on YouTube</a>
+          </div>
+        </div>
+      </div>
+    `;
+    // If iframe errors after 3s, show fallback
+    setTimeout(()=>{
+      const iframe = videoContainer.querySelector('iframe');
+      try{
+        // Check if iframe is blocked (will be empty)
+        if(iframe && iframe.contentDocument && iframe.contentDocument.body.innerHTML.includes('153')){
+          document.getElementById('video-fallback').style.display='grid';
+        }
+      }catch(e){}
+    }, 3000);
+  } else {
+    videoContainer.innerHTML = `<div style="width:100%;height:100%;background:var(--sand);display:grid;place-items:center;color:var(--leather)"><div style="text-align:center"><div style="font-size:28px">${b.emoji}</div><div style="font-size:12px;margin-top:4px">No video yet</div><div style="font-size:11px;opacity:.6;margin-top:4px">Add a videoUrl in locations.json</div></div></div>`;
+  }
+  
+  document.getElementById('bottom-sheet').classList.add('active');
+  if(viewMode==='list') map.flyTo([b.lat,b.lng], 16);
+}
+
+function closeSheet(){
+  document.getElementById('bottom-sheet').classList.remove('active');
+  activeId=null;
+  renderMarkers();
+}
+
+// Events
+document.getElementById('chips').addEventListener('click', e=>{
+  if(e.target.classList.contains('chip')) setCategory(e.target.dataset.cat);
+});
+search.addEventListener('input', applyFilters);
+document.getElementById('clear').addEventListener('click', ()=>{ search.value=''; applyFilters(); });
+document.getElementById('show-map-btn').addEventListener('click', ()=> setView('map'));
+document.getElementById('toggle-list').addEventListener('click', ()=> setView(viewMode==='map'?'list':'map'));
+document.getElementById('locate').addEventListener('click', ()=>{
+  map.locate({setView:true, maxZoom:15});
+  map.on('locationfound', e=>{
+    if(userMarker) map.removeLayer(userMarker);
+    userMarker = L.marker(e.latlng, {icon: L.divIcon({className:'', html:'<div class="user-dot"></div>', iconSize:[18,18]})}).addTo(map);
+    toast('Found you!');
+  });
+});
+function toast(msg){
+  const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500);
+}
+
+// Expose for inline onclick
+window.openSheet = openSheet;
+
+loadData();
+</script>
+</body>
+</html>
